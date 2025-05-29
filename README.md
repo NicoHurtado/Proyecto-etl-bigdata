@@ -75,7 +75,7 @@ Este proyecto implementa una canalización (pipeline) de Big Data de extremo a e
 Una vez que todos los prerrequisitos y configuraciones estén en su lugar, puede ejecutar toda la canalización utilizando el script `pipeline_orchestrator.py` desde el directorio raíz del proyecto.
 
 ```bash
-python pipeline_orchestrator.py [ruta/a/tu_config.json] [region_aws]
+python pipeline_orchestrator.py
 ```
 
 **El orquestador realizará los siguientes pasos:**
