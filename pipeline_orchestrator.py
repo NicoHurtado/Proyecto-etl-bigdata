@@ -24,6 +24,7 @@ class ProjectOrchestrator:
         logger.info(f"Using AWS region: {self.aws_region}")
         self.emr_client = boto3.client('emr', region_name=self.aws_region)
         self.s3_client = boto3.client('s3', region_name=self.aws_region)
+        self.api_client = None 
         self.config_path = config_path
         self.buckets = self._load_config()
         self._validate_bucket_config()
@@ -129,32 +130,6 @@ class ProjectOrchestrator:
         logger.info("====== Ingestion Stage Completed Successfully ======")
         return True
 
-    def _create_and_upload_bootstrap_script(self):
-        logger.info("Creating and uploading EMR bootstrap script...")
-        scripts_s3_full_path = self.buckets['scripts_bucket']
-        scripts_bucket_name, scripts_base_prefix = self._parse_s3_path(scripts_s3_full_path, 'scripts_bucket')
-        
-        bootstrap_script_content = """#!/bin/bash
-                                sudo python3 -m pip install --upgrade pip
-                                sudo pip3 install -r requirements.txt
-                                """
-        scripts_base_prefix = scripts_base_prefix.rstrip('/') + '/' if scripts_base_prefix else ''
-        bootstrap_s3_key = f"{scripts_base_prefix}bootstrap/install_packages.sh"
-
-        try:
-            self.s3_client.put_object(
-                Bucket=scripts_bucket_name,
-                Key=bootstrap_s3_key,
-                Body=bootstrap_script_content,
-                ContentType='text/x-shellscript'
-            )
-            bootstrap_s3_uri = f"s3://{scripts_bucket_name}/{bootstrap_s3_key}"
-            logger.info(f"Bootstrap script uploaded to {bootstrap_s3_uri}")
-            return bootstrap_s3_uri
-        except Exception as e:
-            logger.error(f"Failed to upload bootstrap script to s3://{scripts_bucket_name}/{bootstrap_s3_key}: {e}")
-            raise
-
 #Subir Spark Scripts a S3
     def _upload_spark_scripts_to_s3(self):
         logger.info("Uploading Spark scripts to S3...")
@@ -188,9 +163,9 @@ class ProjectOrchestrator:
         return uploaded_script_paths
 
 #CREAR CLUSTER
-    def create_emr_cluster(self, bootstrap_s3_path):
-        logger.info(f"Creating EMR cluster with bootstrap script: {bootstrap_s3_path}")
-        cluster_name = f"WeatherAnalyticsCluster-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    def create_emr_cluster(self):
+        logger.info(f"Creating EMR cluster without bootstrap script")
+        cluster_name = "MyEMR"
         
         logs_s3_full_path = self.buckets['logs_bucket']
         logs_bucket_name, logs_base_prefix = self._parse_s3_path(logs_s3_full_path, 'logs_bucket')
@@ -226,12 +201,6 @@ class ProjectOrchestrator:
             'ServiceRole': 'EMR_DefaultRole', 
             'JobFlowRole': 'EMR_EC2_DefaultRole',
             'VisibleToAllUsers': True,
-            'BootstrapActions': [
-                {
-                    'Name': 'InstallCustomPackages',
-                    'ScriptBootstrapAction': {'Path': bootstrap_s3_path}
-                }
-            ],
             'Configurations': [
                 {
                     'Classification': 'spark-defaults',
@@ -383,15 +352,13 @@ class ProjectOrchestrator:
         cluster_id = None 
         
         try:
-            bootstrap_s3_uri = self._create_and_upload_bootstrap_script()
-
             self.run_ingestion_stage()
             
             spark_s3_paths = self._upload_spark_scripts_to_s3()
             if not spark_s3_paths.get('weather_etl.py') or not spark_s3_paths.get('weather_analysis.py'):
                 raise RuntimeError("Essential Spark scripts (ETL or Analysis) failed to upload or were not found.")
 
-            cluster_id = self.create_emr_cluster(bootstrap_s3_path=bootstrap_s3_uri)
+            cluster_id = self.create_emr_cluster()
             self._wait_for_cluster_ready(cluster_id)
 
             if not self.run_etl_stage(cluster_id, spark_s3_paths):
@@ -429,7 +396,21 @@ class ProjectOrchestrator:
 
 if __name__ == "__main__":
     orchestrator = ProjectOrchestrator()
-    orchestrator.run_full_pipeline(cluster_name_prefix="EMR-Pipeline")
-    orchestrator.make_json_public()
-    api_endpoint = orchestrator.expose_results_as_api()
-    print(f"API endpoint: {api_endpoint}")
+    pipeline_result = orchestrator.run_full_pipeline(cluster_name_prefix="EMR-Pipeline")
+
+    if pipeline_result and pipeline_result.get("status") == "SUCCESS":
+        logger.info("Pipeline successful. Attempting to make results public and expose API.")
+        try:
+            orchestrator.make_json_public()
+            if orchestrator.api_client: 
+                api_endpoint = orchestrator.expose_results_as_api()
+                if api_endpoint:
+                    print(f"API endpoint: {api_endpoint}")
+                else:
+                    logger.warning("Failed to create or retrieve API endpoint.")
+            else:
+                logger.warning("API client not initialized. Skipping expose_results_as_api.")
+        except Exception as e:
+            logger.error(f"Error during post-pipeline operations (make_json_public/expose_results_as_api): {e}")
+    else:
+        logger.error("Pipeline failed. Skipping post-pipeline operations.")
