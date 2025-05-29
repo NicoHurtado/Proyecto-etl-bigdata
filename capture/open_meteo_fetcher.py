@@ -3,9 +3,8 @@ import boto3
 import json
 import os
 
-# Load S3 configuration
 try:
-    with open('../config/buckets.json', 'r') as f: # Adjusted path assuming script is in capture/
+    with open('../config/buckets.json', 'r') as f:
         config = json.load(f)
     RAW_BUCKET = config['raw_api_bucket']
 except FileNotFoundError:
@@ -18,6 +17,8 @@ except KeyError as e:
 s3_client = boto3.client('s3')
 
 # Parámetros API
+# Estos son los parametros que se usan para la API de Open-Meteo
+# Se puede cambiar para obtener datos de diferentes fechas y ubicaciones
 latitude = 6.25
 longitude = -75.56
 start_date = "2022-01-01"
@@ -31,12 +32,11 @@ url = (
     f"&daily={daily_vars}&timezone={timezone}"
 )
 
-# Descargar datos y subir a S3
-filename_s3 = f"open_meteo_data_{start_date}_to_{end_date}.json" # Added a prefix for S3 organization
+filename_s3 = f"open_meteo_data_{start_date}_to_{end_date}.json"
 
 print(f"Fetching data from Open-Meteo API for {start_date} to {end_date}...")
 response = requests.get(url)
-response.raise_for_status() # Check for request errors
+response.raise_for_status()
 
 print(f"Uploading data to s3://{RAW_BUCKET}/{filename_s3}")
 

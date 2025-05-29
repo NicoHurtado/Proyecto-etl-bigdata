@@ -2,13 +2,12 @@ import pandas as pd
 from sqlalchemy import create_engine
 import boto3
 import json
-from io import StringIO # Required to treat string as a file
+from io import StringIO
 
-# Load S3 configuration
+
 try:
-    with open('../config/buckets.json', 'r') as f: # Adjusted path
+    with open('../config/buckets.json', 'r') as f:
         config = json.load(f)
-    # The full S3 path is in the config, we need to parse bucket and key
     raw_db_s3_path = config['raw_db_bucket']
     if not raw_db_s3_path.startswith("s3://"):
         print("Error: raw_db_bucket in config must be a full S3 path (e.g., s3://bucket-name/path/to/dir/)")
@@ -16,7 +15,6 @@ try:
     
     path_parts = raw_db_s3_path.replace("s3://", "").split("/", 1)
     RAW_DB_BUCKET_NAME = path_parts[0]
-    # Ensure the key ends with a '/' if it's meant to be a prefix/directory
     RAW_DB_S3_KEY_PREFIX = path_parts[1] if len(path_parts) > 1 and path_parts[1] else ''
     if RAW_DB_S3_KEY_PREFIX and not RAW_DB_S3_KEY_PREFIX.endswith('/'):
         RAW_DB_S3_KEY_PREFIX += '/'
@@ -44,13 +42,11 @@ df = pd.read_sql("SELECT * FROM weather_data", engine)
 if df.empty:
     print("No data fetched from database. Nothing to upload.")
 else:
-    # Define S3 object key
     s3_file_name = "weather_data_from_db.csv"
     s3_object_key = f"{RAW_DB_S3_KEY_PREFIX}{s3_file_name}"
 
     print(f"Converting DataFrame to CSV and uploading to s3://{RAW_DB_BUCKET_NAME}/{s3_object_key}")
     
-    # Convert DataFrame to CSV string
     csv_buffer = StringIO()
     df.to_csv(csv_buffer, index=False)
     csv_string = csv_buffer.getvalue()

@@ -14,16 +14,16 @@ class ProjectOrchestrator:
     
     EMR_RELEASE_LABEL = 'emr-6.15.0'
     MASTER_INSTANCE_TYPE = 'm5.xlarge'
-    CORE_INSTANCE_TYPE = 'm4.xlarge' # Changed from m5.xlarge in example to m5.large
+    CORE_INSTANCE_TYPE = 'm4.xlarge' 
     CORE_INSTANCE_COUNT = 2
-    KEEP_JOB_FLOW_ALIVE = True # Set to False if you want the cluster to terminate after steps
+    KEEP_JOB_FLOW_ALIVE = True #
     TERMINATION_PROTECTED = False
 
     def __init__(self, config_path='config/buckets.json', aws_region=None):
         self.aws_region = aws_region if aws_region else os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
         logger.info(f"Using AWS region: {self.aws_region}")
         self.emr_client = boto3.client('emr', region_name=self.aws_region)
-        self.s3_client = boto3.client('s3', region_name=self.aws_region) # Ensure S3 client also uses the region
+        self.s3_client = boto3.client('s3', region_name=self.aws_region)
         self.config_path = config_path
         self.buckets = self._load_config()
         self._validate_bucket_config()
@@ -34,9 +34,6 @@ class ProjectOrchestrator:
             with open(self.config_path, 'r') as f:
                 config = json.load(f)
             logger.info("Configuration loaded successfully.")
-            # Log loaded bucket paths for verification
-            # for key, value in config.items():
-            #     logger.debug(f"Loaded bucket config - {key}: {value}")
             return config
         except FileNotFoundError:
             logger.error(f"Configuration file not found: {self.config_path}")
@@ -49,7 +46,6 @@ class ProjectOrchestrator:
             raise
 
     def _validate_bucket_config(self):
-        """Validates that S3 paths in config are well-formed."""
         required_buckets = [
             'raw_api_bucket', 'raw_db_bucket', 
             'trusted_processed_bucket', 'refined_predictions_bucket', 
@@ -67,7 +63,6 @@ class ProjectOrchestrator:
                 logger.error(msg)
                 raise ValueError(msg)
             
-            # Further parsing to get bucket name and prefix
             parsed_bucket, parsed_prefix = self._parse_s3_path(s3_path, rb_key)
             if not parsed_bucket:
                 msg = f"Could not parse bucket name from '{rb_key}': '{s3_path}'"
@@ -76,19 +71,15 @@ class ProjectOrchestrator:
             logger.info(f"Validated S3 path for '{rb_key}': bucket='{parsed_bucket}', prefix='{parsed_prefix}'")
 
     def _parse_s3_path(self, s3_path, config_key_name=""):
-        """Parses s3://bucket/prefix into (bucket, prefix). Prefix includes trailing / if present."""
         if not s3_path.startswith("s3://"):
             logger.warning(f"S3 path for {config_key_name} '{s3_path}' does not start with s3://. Cannot parse.")
             return None, None
         parts = s3_path.replace("s3://", "").split("/", 1)
         bucket_name = parts[0]
         key_prefix = parts[1] if len(parts) > 1 else ""
-        # if key_prefix and not key_prefix.endswith('/'):
-        #     key_prefix += '/' # Ensure prefix ends with / if it's a folder-like prefix
         return bucket_name, key_prefix
 
     def _run_local_script(self, script_path, script_args=None, cwd=None):
-        """Executes a local Python script using subprocess."""
         if script_args is None:
             script_args = []
         command = [sys.executable, script_path] + script_args
@@ -115,15 +106,10 @@ class ProjectOrchestrator:
             logger.error(f"Error executing local script {script_path}: {e}")
             return False
 
+#FASE 1: INGESTION
     def run_ingestion_stage(self):
-        """Runs the data ingestion scripts."""
         logger.info("====== Starting Ingestion Stage ======")
-        
-        # Get the directory of the current orchestrator script
         orchestrator_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # Run Open-Meteo API fetcher
-        # Assumes open_meteo_fetcher.py is in a 'capture' subdirectory relative to orchestrator
         api_fetcher_script = os.path.join(orchestrator_dir, 'capture', 'open_meteo_fetcher.py')
         logger.info("Running Open-Meteo API data ingestion...")
         api_success = self._run_local_script(api_fetcher_script, cwd=os.path.join(orchestrator_dir, 'capture'))
@@ -132,8 +118,6 @@ class ProjectOrchestrator:
             raise RuntimeError("Open-Meteo API ingestion failed.")
         logger.info("Open-Meteo API data ingestion completed.")
 
-        # Run Database fetcher
-        # Assumes db_fetcher.py is in a 'capture' subdirectory relative to orchestrator
         db_fetcher_script = os.path.join(orchestrator_dir, 'capture', 'db_fetcher.py')
         logger.info("Running Database data ingestion...")
         db_success = self._run_local_script(db_fetcher_script, cwd=os.path.join(orchestrator_dir, 'capture'))
@@ -151,11 +135,9 @@ class ProjectOrchestrator:
         scripts_bucket_name, scripts_base_prefix = self._parse_s3_path(scripts_s3_full_path, 'scripts_bucket')
         
         bootstrap_script_content = """#!/bin/bash
-sudo python3 -m pip install --upgrade pip
-sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
-# Add any other packages required by your Spark jobs
-"""
-        # Ensure base prefix for scripts ends with a slash if it's not empty
+                                sudo python3 -m pip install --upgrade pip
+                                sudo pip3 install -r requirements.txt
+                                """
         scripts_base_prefix = scripts_base_prefix.rstrip('/') + '/' if scripts_base_prefix else ''
         bootstrap_s3_key = f"{scripts_base_prefix}bootstrap/install_packages.sh"
 
@@ -173,8 +155,8 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
             logger.error(f"Failed to upload bootstrap script to s3://{scripts_bucket_name}/{bootstrap_s3_key}: {e}")
             raise
 
+#Subir Spark Scripts a S3
     def _upload_spark_scripts_to_s3(self):
-        """Uploads Spark job scripts to the S3 scripts bucket."""
         logger.info("Uploading Spark scripts to S3...")
         scripts_s3_full_path = self.buckets['scripts_bucket']
         scripts_bucket_name, scripts_base_prefix = self._parse_s3_path(scripts_s3_full_path, 'scripts_bucket')
@@ -191,7 +173,7 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
         for filename in os.listdir(local_spark_jobs_dir):
             if filename.endswith(".py"):
                 local_file_path = os.path.join(local_spark_jobs_dir, filename)
-                s3_key = f"{scripts_base_prefix}{filename}" # Upload directly under scripts_base_prefix
+                s3_key = f"{scripts_base_prefix}{filename}"
                 try:
                     self.s3_client.upload_file(local_file_path, scripts_bucket_name, s3_key)
                     script_s3_uri = f"s3://{scripts_bucket_name}/{s3_key}"
@@ -202,10 +184,10 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
                     raise
         if not uploaded_script_paths:
             logger.warning(f"No Spark scripts found or uploaded from {local_spark_jobs_dir}")
-            # Depending on requirements, this could be an error
         logger.info("Spark scripts upload completed.")
         return uploaded_script_paths
 
+#CREAR CLUSTER
     def create_emr_cluster(self, bootstrap_s3_path):
         logger.info(f"Creating EMR cluster with bootstrap script: {bootstrap_s3_path}")
         cluster_name = f"WeatherAnalyticsCluster-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
@@ -241,8 +223,8 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
                 'KeepJobFlowAliveWhenNoSteps': self.KEEP_JOB_FLOW_ALIVE,
                 'TerminationProtected': self.TERMINATION_PROTECTED,
             },
-            'ServiceRole': 'EMR_DefaultRole', # Ensure this role exists and has permissions
-            'JobFlowRole': 'EMR_EC2_DefaultRole', # Ensure this role exists and has permissions
+            'ServiceRole': 'EMR_DefaultRole', 
+            'JobFlowRole': 'EMR_EC2_DefaultRole',
             'VisibleToAllUsers': True,
             'BootstrapActions': [
                 {
@@ -257,7 +239,6 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
                         'spark.sql.adaptive.enabled': 'true',
                         'spark.sql.adaptive.coalescePartitions.enabled': 'true',
                         'spark.serializer': 'org.apache.spark.serializer.KryoSerializer'
-                        # 'spark.sql.hive.metastore.version': '2.3.9' # Usually not needed for emr-6.x+
                     }
                 }
             ]
@@ -274,11 +255,11 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
 
     def _wait_for_cluster_ready(self, cluster_id):
         logger.info(f"Waiting for EMR cluster {cluster_id} to become ready (state: WAITING)...")
-        waiter = self.emr_client.get_waiter('cluster_running') # Waits for RUNNING or WAITING
+        waiter = self.emr_client.get_waiter('cluster_running') 
         try:
             waiter.wait(
                 ClusterId=cluster_id,
-                WaiterConfig={'Delay': 60, 'MaxAttempts': 30} # Check every 60s, max 30 mins
+                WaiterConfig={'Delay': 60, 'MaxAttempts': 30}
             )
             cluster_description = self.emr_client.describe_cluster(ClusterId=cluster_id)
             status = cluster_description['Cluster']['Status']['State']
@@ -301,10 +282,8 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
             logger.info(f"EMR cluster {cluster_id} termination initiated.")
         except Exception as e:
             logger.error(f"Failed to terminate EMR cluster {cluster_id}: {e}")
-            # Not raising here, as it might be called in a finally block
 
     def _submit_emr_step(self, cluster_id, step_name, script_s3_path, script_args):
-        """Submits a Spark job as a step to an EMR cluster."""
         logger.info(f"Submitting EMR step: {step_name} (Script: {script_s3_path}, Args: {script_args})")
         full_args = ['spark-submit', '--deploy-mode', 'cluster', script_s3_path] + script_args
         step_config = {
@@ -322,7 +301,6 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
             raise
 
     def _wait_for_step_completion(self, cluster_id, step_id, step_name):
-        """Waits for an EMR step to complete."""
         logger.info(f"Waiting for EMR step '{step_name}' (ID: {step_id}) to complete...")
         waiter = self.emr_client.get_waiter('step_complete')
         try:
@@ -347,6 +325,7 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
                 logger.error(f"Could not retrieve status for step {step_id} after wait error: {desc_e}")
             raise
 
+#FASE 2: ETL
     def run_etl_stage(self, cluster_id, spark_script_s3_paths):
         logger.info("====== Starting ETL Stage ======")
         script_filename = 'weather_etl.py'
@@ -364,6 +343,7 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
         logger.info(f"====== ETL Stage Completed with status: {status} ======")
         return status == 'COMPLETED'
 
+#FASE 3: ANALYSIS
     def run_analysis_stage(self, cluster_id, spark_script_s3_paths):
         logger.info("====== Starting Analysis Stage ======")
         script_filename = 'weather_analysis.py'
@@ -379,33 +359,44 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
         status = self._wait_for_step_completion(cluster_id, analysis_step_id, "WeatherAnalysisSparkJob")
         logger.info(f"====== Analysis Stage Completed with status: {status} ======")
         return status == 'COMPLETED'
+    
+    def make_json_public(self):
+        self.s3_client.put_object_acl(
+            ACL='public-read',
+            Bucket='weather-etl-refined-nicojaco',
+            Key='weather_predictions/part-00000-...json'
+        )
+    
+    def expose_results_as_api(self):
+        response = self.api_client.create_api(
+            Name='weather-api',
+            ProtocolType='HTTP',
+            Target='https://weather-etl-refined-nicojaco.s3.amazonaws.com/weather_predictions/part-00000-...json'
+        )
+        return response['ApiEndpoint']
+    
 
-    def run_full_pipeline(self, cluster_name_prefix="WeatherAnalytics"):
+#PIPELINE COMPLETA
+    def run_full_pipeline(self, cluster_name_prefix="EMR-Pipeline"):
         logger.info(f"🚀🚀🚀 Starting Full Weather Data Pipeline (EMR cluster: {cluster_name_prefix}) 🚀🚀🚀")
         start_time = datetime.now()
-        cluster_id = None # Initialize cluster_id
+        cluster_id = None 
         
         try:
-            # 0. Create and Upload Bootstrap Script
             bootstrap_s3_uri = self._create_and_upload_bootstrap_script()
 
-            # 1. Run local ingestion scripts
             self.run_ingestion_stage()
             
-            # 2. Upload Spark scripts to S3
             spark_s3_paths = self._upload_spark_scripts_to_s3()
             if not spark_s3_paths.get('weather_etl.py') or not spark_s3_paths.get('weather_analysis.py'):
                 raise RuntimeError("Essential Spark scripts (ETL or Analysis) failed to upload or were not found.")
 
-            # 3. Create EMR cluster
             cluster_id = self.create_emr_cluster(bootstrap_s3_path=bootstrap_s3_uri)
             self._wait_for_cluster_ready(cluster_id)
 
-            # 4. Run ETL Spark job on EMR
             if not self.run_etl_stage(cluster_id, spark_s3_paths):
                 raise RuntimeError("ETL stage failed.")
 
-            # 5. Run Analysis Spark job on EMR
             if not self.run_analysis_stage(cluster_id, spark_s3_paths):
                 raise RuntimeError("Analysis stage failed.")
             
@@ -420,9 +411,6 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
             end_time = datetime.now()
             logger.error(f"❌❌❌ Pipeline FAILED: {e} ❌❌❌")
             logger.error(f"Total execution time before failure: {end_time - start_time}")
-            # If cluster was created and KeepJobFlowAliveWhenNoSteps is False, it might terminate on its own
-            # Otherwise, or if failure was before/during cluster setup, manual cleanup might be needed.
-            # If KEEP_JOB_FLOW_ALIVE is True, cluster will remain running.
             if cluster_id and self.KEEP_JOB_FLOW_ALIVE:
                 logger.warning(f"Cluster {cluster_id} was left running due to KEEP_JOB_FLOW_ALIVE=True.")
             elif cluster_id and not self.KEEP_JOB_FLOW_ALIVE :
@@ -432,32 +420,16 @@ sudo pip3 install pandas boto3 mysql-connector-python scikit-learn
                 "total_duration_seconds": (end_time - start_time).total_seconds()
             }
         finally:
-            # Optional: Terminate cluster if KEEP_JOB_FLOW_ALIVE is False
             if cluster_id and not self.KEEP_JOB_FLOW_ALIVE:
                 logger.info(f"KEEP_JOB_FLOW_ALIVE is False. Initiating termination for cluster {cluster_id}.")
-                # Add a small delay to allow EMR to process last step status before termination
                 time.sleep(60) 
                 self.terminate_emr_cluster(cluster_id)
             elif cluster_id and self.KEEP_JOB_FLOW_ALIVE:
                 logger.info(f"KEEP_JOB_FLOW_ALIVE is True. Cluster {cluster_id} will remain running.")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python pipeline_orchestrator.py <emr_cluster_id> [config_file_path]")
-        print("Example: python pipeline_orchestrator.py j-ABC123XYZ789 config/buckets.json")
-        sys.exit(1)
-    
-    emr_cluster_id = sys.argv[1]
-    config_file = sys.argv[2] if len(sys.argv) > 2 else 'config/buckets.json'
-
-    logger.info(f"Initializing orchestrator with EMR Cluster ID: {emr_cluster_id} and Config: {config_file}")
-    
-    orchestrator = ProjectOrchestrator(config_path=config_file)
-    
-    results = orchestrator.run_full_pipeline(emr_cluster_id)
-    
-    logger.info("Pipeline Execution Summary:")
-    print(json.dumps(results, indent=2))
-
-    if results["status"] == "FAILED":
-        sys.exit(1) # Exit with error code if pipeline failed 
+    orchestrator = ProjectOrchestrator()
+    orchestrator.run_full_pipeline(cluster_name_prefix="EMR-Pipeline")
+    orchestrator.make_json_public()
+    api_endpoint = orchestrator.expose_results_as_api()
+    print(f"API endpoint: {api_endpoint}")
