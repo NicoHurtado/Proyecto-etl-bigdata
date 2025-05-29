@@ -1,2 +1,6 @@
 boto3
 requests
+pandas
+SQLAlchemy
+PyMySQL
+pyspark

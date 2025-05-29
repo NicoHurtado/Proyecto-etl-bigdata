@@ -1,0 +1,8 @@
+{
+  "raw_api_bucket": "s3://weather-etl-raw-nicojaco/open_meteo/",
+  "raw_db_bucket": "s3://weather-etl-raw-nicojaco/open_meteo/data_extract_from_db/",
+  "trusted_processed_bucket": "s3://weather-etl-trusted-nicojaco/processed_weather/",
+  "refined_predictions_bucket": "s3://weather-etl-refined-nicojaco/weather_predictions/",
+  "scripts_bucket": "s3://weather-etl-raw-nicojaco/spark_jobs/",
+  "logs_bucket": "s3://weather-etl-logs-nicojaco/"
+} 
