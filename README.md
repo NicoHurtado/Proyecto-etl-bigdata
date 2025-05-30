@@ -1,4 +1,4 @@
-# Canalización de Analítica de Datos Climáticos a Gran Escala en AWS
+# Proyecto 3 - Telematica
 
 **Autores:** Nicolas Hurtado A. & Jacobo Restrepo M.
 **Curso:** Tópicos Especiales en Telemática
