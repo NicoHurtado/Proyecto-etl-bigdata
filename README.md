@@ -1,13 +1,41 @@
 # Proyecto 3 - Telematica
 
-**Autores:** Nicolas Hurtado A. & Jacobo Restrepo M.
 **Curso:** Tópicos Especiales en Telemática
 
----
+**Autores:** Nicolas Hurtado A. & Jacobo Restrepo M.
+Nicolas Hurtado A - nhurtadoa@eafit.edu.co
+Jacobo Restrepo M - jrestrep32@eafit.edu.co
 
-## 1. Resumen del Proyecto
+**Profesor:** 
+Edwin Nelson Montoya Munera
+emontoya@eafit.edu.co
+
+## 1. # Proyecto 3 - Telematica
 
 Este proyecto implementa una canalización (pipeline) de Big Data de extremo a extremo en Amazon Web Services (AWS) para ingerir, procesar, analizar y servir datos relacionados con el clima. La canalización obtiene datos de dos fuentes principales: la API de Open-Meteo para información meteorológica histórica y una base de datos relacional (Simulada). Luego, aprovecha AWS EMR para el procesamiento distribuido con Spark para realizar operaciones ETL (Extraer, Transformar, Cargar) y hacer analisis y prediccion sobre estos. Los datos procesados se almacenan en diferentes buckets de S3 que representan zonas de datos crudos (raw), confiables (trusted) y refinados (refined). Todo el proceso está automatizado por un script orquestador basado en Python.
+
+Aspectos Cumplidos:
+
+*   **Ingesta de Datos:**
+    *   Se obtuvieron datos meteorológicos (temperatura máxima y precipitación) a través de una API.
+    *   Se obtuvieron los datos a travez de una base de datos relacional (creada)
+*   **Procesamiento de Datos Escalable:** Utiliza Apache Spark en AWS EMR para ejecutar steps.
+*   **Análisis Exploratorio de Datos (EDA):**
+    *   El script de Spark (`scripts/spark_jobs/weather_analysis.py`) carga los datos y realiza un análisis descriptivo básico.
+*   **Almacenamiento de Datos por Capas (Data Lake):** Organiza los datos en zonas Crudas, Confiables y Refinadas en Amazon S3.
+*   **Orquestación Automatizada:** Un script central de Python (`pipeline_orchestrator.py`) gestiona todo el flujo de trabajo
+*   **Servicio de las predicciones**
+    
+
+Aspectos con Oportunidades de Mejora:
+
+*   **Ejecución y Robustez del Script de Automatización:**
+    *   Se reportaron problemas con la ejecución repetida del script de automatización. Inicialmente funcionó, pero presentó errores en ejecuciones subsecuentes. Esto podría deberse a:
+        *   Problemas de configuración del entorno ya creado.
+        *   Gestión de conexiones.
+        *   Permisos y Roles (Muy Importante)
+*   **Servicio de las predicciones en una api unica para esto y acceso a su permiso**
+    *   Aunque se generó un script SQL para la carga manual, la automatización completa del proceso ETL (Extracción desde la API, Transformación y Carga a la BD) no se abordó completamente en el script de Spark.
 
 ## 2. Características Principales
 
@@ -41,34 +69,9 @@ Este proyecto implementa una canalización (pipeline) de Big Data de extremo a e
 └── README.md                         
 ```
 
-## 4. Prerrequisitos
-
-### 4.1. Cuenta de AWS y Servicios
-
-*   Una cuenta activa de AWS.
-*   **Roles de IAM:**
-    *   `EMR_DefaultRole`: Rol de servicio para EMR.
-    *   `EMR_EC2_DefaultRole`: Perfil de instancia EC2 para las instancias del clúster EMR.
-    Asegúrese de que estos roles tengan los permisos necesarios (por ejemplo, acceso a S3, operaciones de EMR). (Aveces causa problema los permisos en IAM)
-*   **Par de Claves EC2 (EC2 Key Pair):** Se requiere un Par de Claves EC2 para crear el clúster EMR. El nombre de este par de claves debe configurarse en `pipeline_orchestrator.py`
-*   **Buckets de S3:** Configure este archivo de configuraciones
-
-### 4.2. Configuración del Entorno Local
-
-*   **Python 3.8+**
-*   **AWS CLI:** Configurada con sus credenciales de AWS y región predeterminada. (ej. `aws configure`)
-    ```bash
-    aws configure
-    AWS Access Key ID [None]: TU_ACCESS_KEY
-    AWS Secret Access Key [None]: TU_SECRET_KEY
-    Default region name [None]: tu-region-aws (ej. us-east-1)
-    Default output format [None]: json
-    ```
-*   **Git** (para clonar el repositorio, si aplica).
-*   Instalar dependencias de Python:
-    ```bash
-    pip install -r requirements.txt
-    ```
+## Guia tecnica:
+Se adjunto adicionalmente una guia aun mas detallada y tecnica para este proyecto
+(Guia_proyecto3_Nico_Jaco.pdf)
 
 ## 5. Cómo Ejecutar la Canalización
 
