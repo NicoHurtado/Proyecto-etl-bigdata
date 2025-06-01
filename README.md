@@ -65,7 +65,9 @@ Aspectos con Oportunidades de Mejora:
 │       ├── weather_etl.py            
 │       └── weather_analysis.py       
 ├── pipeline_orchestrator.py          
-├── requirements.txt                  
+├── requirements.txt
+|-- insert_script.sql
+|-- Guia_proyecto3_Nico_Jaco.pdf                  
 └── README.md                         
 ```
 
