@@ -2,8 +2,10 @@
 
 **Curso:** Tópicos Especiales en Telemática
 
-**Autores:** Nicolas Hurtado A. & Jacobo Restrepo M.
+**Autores:**
+
 Nicolas Hurtado A - nhurtadoa@eafit.edu.co
+
 Jacobo Restrepo M - jrestrep32@eafit.edu.co
 
 **Profesor:** 
