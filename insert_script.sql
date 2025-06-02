@@ -431,11 +431,3 @@ INSERT INTO DailyWeather (
     (1, '2022-12-29', 24.4, 1.00, '°C', 'mm'),
     (1, '2022-12-30', 25.6, 0.20, '°C', 'mm'),
     (1, '2022-12-31', 24.6, 2.90, '°C', 'mm');
-
--- Ejemplo de cómo consultar los datos insertados:
--- SELECT * FROM LocationInfo;
--- SELECT li.timezone, dw.observation_date, dw.temperature_2m_max, dw.precipitation_sum
--- FROM LocationInfo li
--- JOIN DailyWeather dw ON li.location_id = dw.location_id
--- WHERE li.location_id = 1 -- O el ID que se haya generado
--- ORDER BY dw.observation_date; 
