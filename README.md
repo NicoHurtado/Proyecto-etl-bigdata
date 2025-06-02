@@ -41,6 +41,11 @@ Aspectos con Oportunidades de Mejora:
 
 ## 2. Características Principales
 
+**Arquitectura general**
+
+![Diagrama en blanco - Página 1](https://github.com/user-attachments/assets/dc30f95e-eaea-4aeb-933e-27dbeaf92655)
+
+
 *   **Ingesta de Datos Automatizada:** Scripts para obtener datos de la API de Open-Meteo y una base de datos relacional (simulada).
 *   **Procesamiento de Datos Escalable:** Utiliza Apache Spark en AWS EMR para ejecutar steps.
 *   **Almacenamiento de Datos por Capas (Data Lake):** Organiza los datos en zonas Crudas, Confiables y Refinadas en Amazon S3.
